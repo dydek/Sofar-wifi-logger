@@ -15,10 +15,11 @@
 #define WIFI_HOSTNAME "sofar-logger"
 
 #define PV_SERV "dane.pvmonitor.pl"
-// #define TESTING 0
+// #define TESTING
 
 Scheduler runner;
 
+//tasks
 void fetchDataFromSofarAndSend();
 void uploadDataToPVMonitor();
 
@@ -71,7 +72,7 @@ void loop()
 void fetchDataFromSofarAndSend()
 {
   uint8 max_tries = 15;
-  Serial.println("Fetching data from sofar....");
+  Serial.println(F("Fetching data from sofar...."));
   byte buffor[220];
 #ifdef TESTING
   // Serial.write(crapToSend, 36);
@@ -103,7 +104,7 @@ void fetchDataFromSofarAndSend()
   if (client.connect(SOFAR_IP, 8899))
   {
     client.write(SOFAR_REQUEST, 36);
-    // the corrdct message from the inverter is 110 long
+    // the correct message from the inverter is 110 long
     while (client.available() < 110 && max_tries > 0)
     {
       delay(100);
