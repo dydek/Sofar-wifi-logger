@@ -75,11 +75,6 @@ void fetchDataFromSofarAndSend()
   Serial.println(F("Fetching data from sofar...."));
   byte buffor[220];
 #ifdef TESTING
-  // Serial.write(crapToSend, 36);
-  // Serial.println();
-  // // Serial.println(crapToSend, 36);
-  // Serial.write("\xa5\x17\x00\x10\x45\x00\x00\x53\x31\x6a\x66\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x03\x00\x00\x00\x27\x05\xd0\xc2\x15", 36);
-  // Serial.println();
   InverterMessage inverterMessage(exampleResponseBytes, 220);
   Serial.print("Total energy: ");
   Serial.println(inverterMessage.getTotalEnergy());
@@ -113,7 +108,7 @@ void fetchDataFromSofarAndSend()
     }
     if (max_tries == 0)
     {
-      Serial.println("Something wen wrong");
+      Serial.println("Something went wrong, will try next time");
       // we need to quit, not possible to proceed frther
       return;
     }
