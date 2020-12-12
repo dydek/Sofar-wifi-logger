@@ -13,6 +13,14 @@
 #define PV_POWER_1 21
 #define PV_POWER_2 23
 
+#define AC_VOLTAGE_1 31
+#define AC_CURRENT_1 33
+#define AC_VOLTAGE_2 35
+#define AC_CURRENT_2 37
+#define AC_VOLTAGE_3 39
+#define AC_CURRENT_4 41
+
+
 #define MODULE_TEMP 55
 
 #define TOTAL_PRODUCTION 43
@@ -38,6 +46,8 @@ public:
     float getPVVoltage(uint8_t stringID);
     float getPVCurrent(uint8_t stringID);
     float getPVPower(uint8_t stringID);
+    float getACVoltage(uint8_t phase);
+    float getACCurrent(uint8_t phase);
     float getModuleTemp();
 };
 

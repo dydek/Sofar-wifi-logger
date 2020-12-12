@@ -6,6 +6,7 @@
 
 #define WIFI_SSID "xxxx"
 #define WIFI_PASS "xxxx"
+#define MDNS_NAME "xxxx"
 #define SOFAR_IP "xxxx"
 #define SOFAR_REQUEST "xxxx"
 

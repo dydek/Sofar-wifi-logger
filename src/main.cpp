@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <TaskScheduler.h>
 
 #include "utils.h"
@@ -13,6 +14,7 @@
 #include "Config.h"
 
 #define WIFI_HOSTNAME "sofar-logger"
+#define MAX_SOFAR_TRIES 150
 
 #define PV_SERV "dane.pvmonitor.pl"
 // #define TESTING
@@ -40,6 +42,12 @@ struct SofarData
   float PVPower1;
   float PVPower2;
   float ModuleTemp;
+  float ACVoltage1;
+  float ACCurrent1;
+  float ACVoltage2;
+  float ACCurrent2;
+  float ACVoltage3;
+  float ACCurrent3;
 } sofarData;
 
 void setup()
@@ -61,6 +69,11 @@ void setup()
   Serial.print("The IP Address of ESP8266 Module is: ");
   Serial.println(WiFi.localIP()); // Print the IP address
 
+  if (!MDNS.begin(MDNS_NAME))
+  { // Start the mDNS responder for *.local
+    Serial.println("Error setting up MDNS responder!");
+  }
+
   runner.startNow();
 }
 
@@ -71,8 +84,8 @@ void loop()
 
 void fetchDataFromSofarAndSend()
 {
-  uint8 max_tries = 15;
-  Serial.println(F("Fetching data from sofar...."));
+  uint8 tries = 0;
+  Serial.print(F("Fetching data from sofar...."));
   byte buffor[220];
 #ifdef TESTING
   InverterMessage inverterMessage(exampleResponseBytes, 220);
@@ -100,17 +113,19 @@ void fetchDataFromSofarAndSend()
   {
     client.write(SOFAR_REQUEST, 36);
     // the correct message from the inverter is 110 long
-    while (client.available() < 110 && max_tries > 0)
+    while (client.available() < 110 && tries < MAX_SOFAR_TRIES)
     {
-      delay(100);
-      Serial.print(".");
-      max_tries--;
+      delay(10);
+      tries++;
     }
-    if (max_tries == 0)
+    if (tries == MAX_SOFAR_TRIES)
     {
       Serial.println("Something went wrong, will try next time");
       // we need to quit, not possible to proceed frther
       return;
+    } else {
+      // TODO change it 
+      Serial.printf(" (took %d ms)\n", tries*10);
     }
 
     delay(2);
@@ -126,6 +141,16 @@ void fetchDataFromSofarAndSend()
     sofarData.PVPower1 = inverterMessage.getPVPower(1);
     sofarData.PVPower2 = inverterMessage.getPVPower(2);
     sofarData.ModuleTemp = inverterMessage.getModuleTemp();
+
+    // AC Voltages
+    sofarData.ACVoltage1 = inverterMessage.getACVoltage(1);
+    sofarData.ACCurrent1 = inverterMessage.getACCurrent(1);
+
+    sofarData.ACVoltage2 = inverterMessage.getACVoltage(2);
+    sofarData.ACCurrent2 = inverterMessage.getACCurrent(2);
+
+    sofarData.ACVoltage3 = inverterMessage.getACVoltage(3);
+    sofarData.ACCurrent3 = inverterMessage.getACCurrent(3);
 
     client.flush();
     client.stop();
@@ -160,14 +185,32 @@ void uploadDataToPVMonitor()
     pvClient.print(sofarData.PVCurrent2);
     pvClient.print("&f34=");
     pvClient.print(sofarData.ModuleTemp);
+    // phase 1
+    pvClient.print("&f320=");
+    pvClient.print(sofarData.ACVoltage1);
+    pvClient.print("&f420=");
+    pvClient.print(sofarData.ACCurrent1);
+    // phase 2
+    pvClient.print("&f322=");
+    pvClient.print(sofarData.ACVoltage2);
+    pvClient.print("&f422=");
+    pvClient.print(sofarData.ACCurrent2);
+    // phase 3
+    pvClient.print("&f324=");
+    pvClient.print(sofarData.ACVoltage3);
+    pvClient.print("&f424=");
+    pvClient.print(sofarData.ACCurrent3);
     pvClient.print(" HTTP/1.0\r\n\r\n");
     Serial.println(F("Data has been sent.."));
 
     String response = pvClient.readStringUntil('\r');
     Serial.println(response);
-    if(response.startsWith("HTTP/1.1 200 OK")) {
+    if (response.startsWith(F("HTTP/1.1 200 OK")))
+    {
       Serial.print(F("OK   "));
-    } else {
+    }
+    else
+    {
       Serial.println(F("Error..."));
     }
     client.flush();

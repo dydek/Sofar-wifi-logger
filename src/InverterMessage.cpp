@@ -81,6 +81,24 @@ float InverterMessage::getPVPower(uint8_t stringID)
     }
 }
 
+float InverterMessage::getACVoltage(uint8_t phase)
+{
+    if (phase < 1 || phase > 3)
+    {
+        phase = 1;
+    }
+    return this->getShort(AC_VOLTAGE_1 + (phase - 1) * 4);
+};
+
+float InverterMessage::getACCurrent(uint8_t phase)
+{
+    if (phase < 1 || phase > 3)
+    {
+        phase = 1;
+    }
+    return this->getShort(AC_CURRENT_1 + (phase - 1) * 4, 100);
+};
+
 float InverterMessage::getModuleTemp()
 {
     return this->getShort(MODULE_TEMP, 10);
