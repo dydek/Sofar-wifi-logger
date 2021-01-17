@@ -17,16 +17,42 @@
 #define MAX_SOFAR_TRIES 150
 
 #define PV_SERV "dane.pvmonitor.pl"
-// #define TESTING
 
 Scheduler runner;
+
+#if MEASURE_CONSUMPTION
+
+uint32 impulses;
+
+ICACHE_RAM_ATTR void measureConsumption()
+{
+  // for many devices we need to filter the noise, usually it's around 50 to 100ms, 
+  // which gives us max around 45kwh per hour max accurate counting 
+  static unsigned long last_interrupt_time = 0;
+  unsigned long interrupt_time = millis();
+  // 150 noise filtering 
+  if (interrupt_time - last_interrupt_time > 150)
+  {
+    impulses++;
+    // probably won't happen - even when using smaller variable (with 4000kw per month should be ok for around ~89 years)
+    if(impulses>UINT32_MAX) impulses = 0;
+  }
+  last_interrupt_time = interrupt_time;
+}
+
+float getConsumption()
+{
+  return impulses / float(MEASURE_CONSUMPTION_IMPULSES_PER_KWH);
+}
+
+#endif
 
 //tasks
 void fetchDataFromSofarAndSend();
 void uploadDataToPVMonitor();
 
 Task t1(15000, TASK_FOREVER, &fetchDataFromSofarAndSend, &runner, true);
-Task t2(60 * 3 * 1000, TASK_FOREVER, &uploadDataToPVMonitor, &runner, true);
+Task t2(30 * 1000, TASK_FOREVER, &uploadDataToPVMonitor, &runner, true);
 
 WiFiClient client;
 WiFiClient pvClient;
@@ -74,6 +100,14 @@ void setup()
     Serial.println("Error setting up MDNS responder!");
   }
 
+#if MEASURE_CONSUMPTION
+  pinMode(MEASURE_CONSUMPTION_PIN, INPUT_PULLUP);
+  attachInterrupt(
+      digitalPinToInterrupt(MEASURE_CONSUMPTION_PIN),
+      measureConsumption,
+      FALLING);
+#endif
+
   runner.startNow();
 }
 
@@ -120,12 +154,14 @@ void fetchDataFromSofarAndSend()
     }
     if (tries == MAX_SOFAR_TRIES)
     {
-      Serial.println("Something went wrong, will try next time");
+      Serial.println(F("Something went wrong, will try next time"));
       // we need to quit, not possible to proceed frther
       return;
-    } else {
-      // TODO change it 
-      Serial.printf(" (took %d ms)\n", tries*10);
+    }
+    else
+    {
+      // TODO change it
+      Serial.printf(" (took %d ms)\n", tries * 10);
     }
 
     delay(2);
@@ -157,7 +193,7 @@ void fetchDataFromSofarAndSend()
   }
   else
   {
-    Serial.println("Can't connect to Sofar");
+    Serial.println(F("Can't connect to Sofar"));
   }
 #endif
 }
@@ -167,40 +203,46 @@ void uploadDataToPVMonitor()
   if (pvClient.connect(PV_SERV, 80))
   {
     Serial.print(F("Sending data...   "));
-    pvClient.print("GET http://");
+    pvClient.print(F("GET http://"));
     pvClient.print(PV_SERV);
-    pvClient.print("/pv/get2.php?idl=");
+    pvClient.print(F("/pv/get2.php?idl="));
     pvClient.print(PV_ID);
-    pvClient.print("&p=");
+    pvClient.print(F("&p="));
     pvClient.print(PV_PASS);
-    pvClient.print("&f1=");
+    pvClient.print(F("&f1="));
     pvClient.print(sofarData.todayEnergy);
-    pvClient.print("&f2=");
+    pvClient.print(F("&f2="));
     pvClient.print(sofarData.PVVoltage1);
-    pvClient.print("&f3=");
+    pvClient.print(F("&f3="));
     pvClient.print(sofarData.PVCurrent1);
-    pvClient.print("&f5=");
+    pvClient.print(F("&f5="));
     pvClient.print(sofarData.PVVoltage2);
-    pvClient.print("&f6=");
+    pvClient.print(F("&f6="));
     pvClient.print(sofarData.PVCurrent2);
-    pvClient.print("&f34=");
+    pvClient.print(F("&f34="));
     pvClient.print(sofarData.ModuleTemp);
     // phase 1
-    pvClient.print("&f320=");
+    pvClient.print(F("&f320="));
     pvClient.print(sofarData.ACVoltage1);
-    pvClient.print("&f420=");
+    pvClient.print(F("&f420="));
     pvClient.print(sofarData.ACCurrent1);
     // phase 2
-    pvClient.print("&f322=");
+    pvClient.print(F("&f322="));
     pvClient.print(sofarData.ACVoltage2);
-    pvClient.print("&f422=");
+    pvClient.print(F("&f422="));
     pvClient.print(sofarData.ACCurrent2);
     // phase 3
-    pvClient.print("&f324=");
+    pvClient.print(F("&f324="));
     pvClient.print(sofarData.ACVoltage3);
-    pvClient.print("&f424=");
+    pvClient.print(F("&f424="));
     pvClient.print(sofarData.ACCurrent3);
-    pvClient.print(" HTTP/1.0\r\n\r\n");
+#if MEASURE_CONSUMPTION
+    pvClient.printf("&f4=%.4f", getConsumption());
+    // Serial.print(F("Consumption ( Kwh ): "));
+    // Serial.printf("&f4=%.4f\n", getConsumption());
+    // Serial.println(impulses);
+#endif
+    pvClient.print(F(" HTTP/1.0\r\n\r\n"));
     Serial.println(F("Data has been sent.."));
 
     String response = pvClient.readStringUntil('\r');

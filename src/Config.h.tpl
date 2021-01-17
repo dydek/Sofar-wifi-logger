@@ -9,6 +9,7 @@
 #define MDNS_NAME "xxxx"
 #define SOFAR_IP "xxxx"
 #define SOFAR_REQUEST "xxxx"
+#define MEASURE_CONSUMPTION 0
 
 #define PV_ID "xxxx"
 #define PV_PASS "xxxx"
