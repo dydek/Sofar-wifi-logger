@@ -9,7 +9,9 @@
 #define MDNS_NAME "xxxx"
 #define SOFAR_IP "xxxx"
 #define SOFAR_REQUEST "xxxx"
-#define MEASURE_CONSUMPTION 0
+#define MEASURE_CONSUMPTION 1
+#define MEASURE_CONSUMPTION_IMPULSES_PER_KWH 800
+#define MEASURE_CONSUMPTION_PIN D3
 
 #define PV_ID "xxxx"
 #define PV_PASS "xxxx"

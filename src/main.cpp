@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <TaskScheduler.h>
+#include <ezTime.h>
 
 #include "utils.h"
 #include "InverterMessage.h"
@@ -16,9 +17,10 @@
 #define WIFI_HOSTNAME "sofar-logger"
 #define MAX_SOFAR_TRIES 150
 
-#define PV_SERV "dane.pvmonitor.pl"
+#define PV_SERV F("dane.pvmonitor.pl")
 
 Scheduler runner;
+Timezone pvTZ;
 
 #if MEASURE_CONSUMPTION
 
@@ -26,16 +28,17 @@ uint32 impulses;
 
 ICACHE_RAM_ATTR void measureConsumption()
 {
-  // for many devices we need to filter the noise, usually it's around 50 to 100ms, 
-  // which gives us max around 45kwh per hour max accurate counting 
+  // for many devices we need to filter the noise, usually it's around 50 to 100ms,
+  // which gives us max around 45kwh per hour max accurate counting
   static unsigned long last_interrupt_time = 0;
   unsigned long interrupt_time = millis();
-  // 150 noise filtering 
+  // 150 noise filtering
   if (interrupt_time - last_interrupt_time > 150)
   {
     impulses++;
     // probably won't happen - even when using smaller variable (with 4000kw per month should be ok for around ~89 years)
-    if(impulses>UINT32_MAX) impulses = 0;
+    if (impulses > UINT32_MAX)
+      impulses = 0;
   }
   last_interrupt_time = interrupt_time;
 }
@@ -90,6 +93,13 @@ void setup()
     Serial.print("*");
   }
 
+  waitForSync();
+
+  // set location for the PL timezone 
+  pvTZ.setLocation(F("Europe/Warsaw"));
+
+  Serial.println(pvTZ.dateTime("Y-m-d\\TH:i:s"));
+
   Serial.println();
   Serial.println("WiFi connection Successful");
   Serial.print("The IP Address of ESP8266 Module is: ");
@@ -107,7 +117,6 @@ void setup()
       measureConsumption,
       FALLING);
 #endif
-
   runner.startNow();
 }
 
@@ -203,12 +212,15 @@ void uploadDataToPVMonitor()
   if (pvClient.connect(PV_SERV, 80))
   {
     Serial.print(F("Sending data...   "));
+
     pvClient.print(F("GET http://"));
     pvClient.print(PV_SERV);
     pvClient.print(F("/pv/get2.php?idl="));
     pvClient.print(PV_ID);
     pvClient.print(F("&p="));
     pvClient.print(PV_PASS);
+    pvClient.print(F("&tm="));
+    pvClient.print(pvTZ.dateTime("Y-m-d\\TH:i:s"));
     pvClient.print(F("&f1="));
     pvClient.print(sofarData.todayEnergy);
     pvClient.print(F("&f2="));
@@ -238,9 +250,6 @@ void uploadDataToPVMonitor()
     pvClient.print(sofarData.ACCurrent3);
 #if MEASURE_CONSUMPTION
     pvClient.printf("&f4=%.4f", getConsumption());
-    // Serial.print(F("Consumption ( Kwh ): "));
-    // Serial.printf("&f4=%.4f\n", getConsumption());
-    // Serial.println(impulses);
 #endif
     pvClient.print(F(" HTTP/1.0\r\n\r\n"));
     Serial.println(F("Data has been sent.."));
@@ -259,3 +268,8 @@ void uploadDataToPVMonitor()
     client.stop();
   }
 }
+
+// void updateNTPClient()
+// {
+//   timeClient.update();
+// }
